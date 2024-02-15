@@ -43,6 +43,9 @@ class MyApplication:
         self.is_capturing = False
         self.btn_start.config(state=tk.NORMAL)
         self.btn_stop.config(state=tk.DISABLED)
+    # Clears the last frame from stop capture getting stuck
+        self.canvas.delete("all")
+
         
     def update(self):
         # updating video frames continuously
