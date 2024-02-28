@@ -1,129 +1,139 @@
 import tkinter as tk
-import cv2
-from PIL import Image, ImageTk
-import numpy as np
-import os
+from tkinter import messagebox
+import sqlite3
+from admin_panel import AdminPanel
+from teacher_panel import TeachersPanel
 
-class CustomButton(tk.Button):
-    def __init__(self, master=None, **kwargs):
-        super().__init__(master, **kwargs)
-        self.configure(
-            relief=tk.FLAT,
-            bg="#4CAF50",  # Background color
-            fg="white",   # Text color
-            font=("Helvetica", 12),
-            padx=10,      # Horizontal padding
-            pady=5,       # Vertical padding
-            activebackground="#45a049",  # Background color when active
-            activeforeground="white",     # Text color when active
-            cursor="hand2"                # Cursor style
+class LoginPage:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("Login Page")
+
+        # Connect to the SQLite database
+        self.conn = sqlite3.connect('attendance.db')
+        self.create_users_table()
+
+        # Welcome label
+        welcome_label = tk.Label(self.root, text="Welcome to the Login Page", font=("Arial", 16))
+        welcome_label.pack(pady=20)
+
+        # Buttons for teacher and admin login
+        btn_teacher_login = self.create_custom_button("Teacher's Login", "teacher")
+        btn_teacher_login.pack(pady=10)
+
+        btn_admin_login = self.create_custom_button("Admin Login", "admin")
+        btn_admin_login.pack(pady=10)
+
+    def create_custom_button(self, text, role):
+        return tk.Button(
+            self.root,
+            text=text,
+            command=lambda: self.open_login_form(role),
+            font=("Arial", 12),
+            relief=tk.GROOVE,
+            bg="#3498db",     # Blue color
+            fg="white",
+            padx=20,
+            pady=10,
+            activebackground="#2980b9"  # Darker blue color when active
         )
 
-class MyApplication:
-    def __init__(self, window, window_title, video_source=0, canvas_width=800, canvas_height=600):
-        self.window = window
-        self.window.title(window_title)
-        self.video_source = video_source
-        self.canvas_width = canvas_width
-        self.canvas_height = canvas_height
-        self.is_capturing = False
-        self.is_registering = False
-        
-        self.frame = tk.Frame(window, bg="#f0f0f0")
-        self.frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Create a canvas to display the video feed
-        self.canvas = tk.Canvas(self.frame, bg="black", width=self.canvas_width, height=self.canvas_height)
-        self.canvas.pack(padx=10, pady=(10, 0))
-        
-        # Buttons for starting and stopping video capture
-        self.btn_start = CustomButton(self.frame, text="Start Capture", width=15, command=self.start_capture)
-        self.btn_start.pack(side=tk.LEFT, padx=10, pady=(20, 0))
-        
-        self.btn_stop = CustomButton(self.frame, text="Stop Capture", width=15, command=self.stop_capture, state=tk.DISABLED)
-        self.btn_stop.pack(side=tk.LEFT, padx=10, pady=(20, 0))
-        
-        self.btn_register = CustomButton(self.frame, text="Register Face", width=15, command=self.register_face, state=tk.DISABLED)
-        self.btn_register.pack(side=tk.LEFT, padx=10, pady=(20, 0))
-        
-        # Open the video source
-        self.vid = cv2.VideoCapture(self.video_source)
-        if not self.vid.isOpened():
-            raise RuntimeError("Error: Could not open video source")
-        
-        # Initialize canvas with a blank image
-        self.blank_image = np.zeros((self.canvas_height, self.canvas_width, 3), np.uint8)
-        self.blank_image[:] = (0, 0, 0)
-        self.blank_photo = ImageTk.PhotoImage(image=Image.fromarray(self.blank_image))
-        
-        # Load the pre-trained face detection model
-        self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        
-        # Start the update loop to display video frames
-        self.update()
-        
-        # Handle window closing event
-        self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
-        
-        # Prevent window from being resized
-        self.window.resizable(False, False)
-        
-        # Start the Tkinter window
-        self.window.mainloop()
-        
-    def start_capture(self):
-        self.is_capturing = True
-        self.btn_start.config(state=tk.DISABLED)
-        self.btn_stop.config(state=tk.NORMAL)
-        self.btn_register.pack(side=tk.LEFT, padx=10, pady=(20, 0))  # Show the Register Face button
-        self.btn_register.config(state=tk.NORMAL)  # Enable the Register Fac button
-        
-    def stop_capture(self):
-        self.is_capturing = False
-        self.btn_start.config(state=tk.NORMAL)
-        self.btn_stop.config(state=tk.DISABLED)
-        self.btn_register.pack_forget()  
-        self.btn_register.config(state=tk.DISABLED)  # Disable the Register Face button
-        # Clear the canvas
-        self.clear_canvas()
-        
-    def register_face(self):
-        pass  
-        
-    def clear_canvas(self):
-        self.canvas.delete("all")
-        self.canvas.create_image(0, 0, image=self.blank_photo, anchor=tk.NW)
-        
-    def update(self):
-        # Updating video frames continuously
-        if self.is_capturing:
-            ret, frame = self.vid.read()
-            if ret:
-                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                # This part fixes mirror video footage from the webcam
-                rgb_frame = cv2.flip(rgb_frame, 1)
-                
-                # Detecting face in every single frames of the video captureeee
-                faces = self.face_cascade.detectMultiScale(rgb_frame, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-                
-                # Draw rectangles around the detected faces
-                for (x, y, w, h) in faces:
-                    cv2.rectangle(rgb_frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
-                
-                # Resize the video frame to match the canvas size
-                rgb_frame = cv2.resize(rgb_frame, (self.canvas_width, self.canvas_height))
-                self.photo = ImageTk.PhotoImage(image=Image.fromarray(rgb_frame))
-                self.canvas.create_image(0, 0, image=self.photo, anchor=tk.NW)
+    def create_users_table(self):
+        # Create a 'users' table if not exists
+        query = '''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            password TEXT NOT NULL,
+            role TEXT NOT NULL
+        );
+        '''
+        self.conn.execute(query)
+        self.conn.commit()
+
+    def open_login_form(self, role):
+        login_form = LoginForm(self.root, role, self.conn, self)
+        login_form.run()
+
+    def run(self):
+        self.root.mainloop()
+
+class LoginForm:
+    def __init__(self, master, role, conn, login_page):
+        self.master = master
+        self.master.withdraw()  # Hide the main window temporarily
+
+        self.login_form = tk.Toplevel(self.master)
+        self.login_form.title(f"{role.capitalize()} Login")
+
+        self.role = role
+        self.conn = conn
+        self.login_page = login_page
+
+        # Entry widgets for username and password
+        self.create_label("Username:")
+        self.username_entry = self.create_entry()
+
+        self.create_label("Password:")
+        self.password_entry = self.create_entry(is_password=True)
+
+        # Button for login
+        btn_login = tk.Button(
+            self.login_form,
+            text="Login",
+            command=self.login,
+            font=("Arial", 12),
+            relief=tk.GROOVE,
+            bg="#3498db",
+            fg="white",
+            padx=20,
+            pady=10,
+            activebackground="#2980b9"
+        )
+        btn_login.pack(pady=10)
+
+    def create_label(self, text):
+        label = tk.Label(self.login_form, text=text, font=("Arial", 12))
+        label.pack(pady=5)
+
+    def create_entry(self, is_password=False):
+        entry = tk.Entry(self.login_form, show='*' if is_password else None, font=("Arial", 12))
+        entry.pack(pady=10)
+        return entry
+
+    def login(self):
+        username = self.username_entry.get()
+        password = self.password_entry.get()
+
+        # Check the role of the user from the database
+        query = "SELECT role FROM users WHERE username=? AND password=?"
+        result = self.conn.execute(query, (username, password)).fetchone()
+
+        if result:
+            role = result[0]
+
+            if role == "admin":
+                # Open the Admin Panel
+                self.open_admin_panel()
+            elif role == "teacher":
+                # Open the Teacher Panel
+                self.open_teacher_panel()
+            else:
+                messagebox.showerror("Invalid Role", "Invalid role for the user.")
         else:
-            # Clear the canvas and display blank image
-            self.clear_canvas()
-        self.window.after(10, self.update)
-        
-    def on_closing(self):
-        # Release the video source and closing the window
-        if self.vid.isOpened():
-            self.vid.release()
-        self.window.destroy()
+            messagebox.showerror("Login Failed", "Invalid username or password.")
 
+    def open_admin_panel(self):
+        self.login_form.destroy()  # Close the login window
+        AdminPanel()
 
-MyApplication(tk.Tk(), "Video Capture")
+    def open_teacher_panel(self):
+        self.login_form.destroy()  # Close the login window
+        TeachersPanel()
+
+    def run(self):
+        self.master.wait_window(self.login_form)
+
+if __name__ == "__main__":
+    login_page = LoginPage()
+    login_page.run()
